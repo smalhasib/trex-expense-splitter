@@ -141,8 +141,8 @@ def get_trip(trip_id: int) -> sqlite3.Row | None:
 def add_participant(trip_id: int, name: str, joined_on: str | None = None) -> int:
     conn = get_conn()
     if not joined_on:
-        trip = conn.execute("SELECT start_date FROM trips WHERE id = ?", (trip_id,)).fetchone()
-        joined_on = trip["start_date"] if trip else date.today().isoformat()
+        # Default to today's date if not provided
+        joined_on = date.today().isoformat()
     try:
         cur = conn.execute(
             "INSERT INTO participants (trip_id, name, joined_on) VALUES (?, ?, ?)",
