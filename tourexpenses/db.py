@@ -38,6 +38,7 @@ def init_db():
             trip_id   INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
             name      TEXT    NOT NULL,
             joined_on TEXT    NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1, -- New column
             UNIQUE(trip_id, name)
         );
 
@@ -80,9 +81,15 @@ def init_db():
             (8, 'Miscellaneous',   '📦');
     """)
 
-    # Migration: add joined_on if missing (for DBs created before this update)
+    # Migration: add joined_on if missing
     try:
         conn.execute("ALTER TABLE participants ADD COLUMN joined_on TEXT NOT NULL DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
+    # Migration: add is_active if missing
+    try:
+        conn.execute("ALTER TABLE participants ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
     except sqlite3.OperationalError:
         pass  # column already exists
     conn.commit()
@@ -162,10 +169,24 @@ def add_participant(trip_id: int, name: str, joined_on: str | None = None) -> in
 
 def remove_participant(trip_id: int, name: str) -> bool:
     conn = get_conn()
-    cur = conn.execute(
-        "DELETE FROM participants WHERE trip_id = ? AND name = ?",
+    # First, check if participant has any expenses
+    has_expenses = conn.execute(
+        "SELECT COUNT(*) FROM expenses WHERE paid_by = (SELECT id FROM participants WHERE trip_id = ? AND name = ?)",
         (trip_id, name),
-    )
+    ).fetchone()[0] > 0
+
+    if has_expenses:
+        # Soft delete
+        cur = conn.execute(
+            "UPDATE participants SET is_active = 0 WHERE trip_id = ? AND name = ?",
+            (trip_id, name),
+        )
+    else:
+        # Hard delete if no expenses
+        cur = conn.execute(
+            "DELETE FROM participants WHERE trip_id = ? AND name = ?",
+            (trip_id, name),
+        )
     removed = cur.rowcount > 0
     conn.commit()
     conn.close()
@@ -175,7 +196,18 @@ def remove_participant(trip_id: int, name: str) -> bool:
 def get_participants(trip_id: int) -> list[sqlite3.Row]:
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, name, joined_on FROM participants WHERE trip_id = ? ORDER BY id",
+        "SELECT id, name, joined_on, is_active FROM participants WHERE trip_id = ? AND is_active = 1 ORDER BY id",
+        (trip_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def get_all_participants(trip_id: int) -> list[sqlite3.Row]:
+    """Return ALL participants including soft-deleted (for settlement math)."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, name, joined_on, is_active FROM participants WHERE trip_id = ? ORDER BY id",
         (trip_id,),
     ).fetchall()
     conn.close()
@@ -318,7 +350,7 @@ def compute_settlement(trip_id: int) -> dict:
         conn.close()
         return {}
 
-    people = get_participants(trip_id)
+    people = get_all_participants(trip_id)
     if not people:
         conn.close()
         return {}
