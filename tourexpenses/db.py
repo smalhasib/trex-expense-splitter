@@ -122,6 +122,16 @@ def close_trip(trip_id: int):
     conn.close()
 
 
+def reopen_trip(trip_id: int):
+    conn = get_conn()
+    conn.execute(
+        "UPDATE trips SET end_date = NULL, is_active = 1 WHERE id = ?",
+        (trip_id,),
+    )
+    conn.commit()
+    conn.close()
+
+
 def list_trips(include_closed: bool = False) -> list[sqlite3.Row]:
     conn = get_conn()
     if include_closed:

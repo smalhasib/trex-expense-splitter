@@ -119,6 +119,21 @@ def trip_end(trip_id):
     _print_settlement(s)
 
 
+@trip.command("reopen")
+@click.argument("trip_id", type=int)
+def trip_reopen(trip_id):
+    """Reopen a closed trip (undo trip end)."""
+    t = db.get_trip(trip_id)
+    if not t:
+        console.print("[red]Trip not found.[/]")
+        sys.exit(1)
+    if t["is_active"]:
+        console.print(f"[yellow]Trip is already active.[/]")
+        return
+    db.reopen_trip(trip_id)
+    console.print(f"[green]✅ Trip reopened:[/] [bold]{t['name']}[/]")
+
+
 @trip.command("list")
 @click.option("--all", "-a", "include_closed", is_flag=True, help="Include closed trips")
 def trip_list(include_closed):
