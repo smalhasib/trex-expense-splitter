@@ -248,7 +248,7 @@ JSON output includes full split details:
 
 ## Tips & Best Practices
 
-- **Currency defaults to BDT** — override at trip start: `--currency USD`
+- **Currency is locked per trip** — set at `trip start` with `--currency` (e.g. `--currency USD`, `--currency BDT`, `--currency MYR`). All expenses and settlements use that currency. To track a trip in a different currency, start a new trip.
 - **Categories are auto-detected** — use `trex cats` to see all 8 default categories
 - **The DB is at `~/.tourexpenses/expenses.db`** — delete it to start fresh
 - **Add participants BEFORE expenses** that should include them

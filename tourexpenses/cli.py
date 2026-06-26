@@ -82,10 +82,14 @@ def trip():
 @trip.command("start")
 @click.argument("name")
 @click.option("--dest", "-d", default="", help="Destination")
-@click.option("--currency", "-c", default="BDT", help="Currency (BDT, USD, etc.)")
+@click.option("--currency", "-c", default="BDT", help="Currency for the entire trip (BDT, USD, etc.) — cannot be changed later")
 @click.option("--people", "-p", "people", default="", help="Comma-separated participant names")
 def trip_start(name, dest, currency, people):
-    """Start a new trip with participants."""
+    """Start a new trip with participants.
+
+    All expenses in this trip will use the currency specified here. Currency
+    is locked to the trip for consistency in settlement calculations.
+    """
     trip_id = db.create_trip(name, dest, currency.upper())
     if people:
         for p_name in [n.strip() for n in people.split(",") if n.strip()]:
