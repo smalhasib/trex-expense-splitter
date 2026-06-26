@@ -249,6 +249,7 @@ JSON output includes full split details:
 ## Tips & Best Practices
 
 - **Currency is locked per trip** — set at `trip start` with `--currency` (e.g. `--currency USD`, `--currency BDT`, `--currency MYR`). All expenses and settlements use that currency. To track a trip in a different currency, start a new trip.
+- **Mixed currencies not supported (v0.1)** — If you need to track expenses in multiple currencies within one trip, that's planned for v0.2. For now, either convert manually to the trip currency at expense time, or run parallel trips.
 - **Categories are auto-detected** — use `trex cats` to see all 8 default categories
 - **The DB is at `~/.tourexpenses/expenses.db`** — delete it to start fresh
 - **Add participants BEFORE expenses** that should include them
