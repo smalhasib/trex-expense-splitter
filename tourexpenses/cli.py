@@ -392,6 +392,73 @@ def exp_shares(expense_id):
     console.print(table)
 
 
+@exp.command("update")
+@click.argument("expense_id", type=int)
+@click.option("--desc", "description", default=None, help="New description")
+@click.option("--date", "expense_date", default=None, help="New date (YYYY-MM-DD)")
+@click.option("--cat", "category_name", default=None, help="New category name")
+@click.option("--amount", type=float, default=None, help="New amount (recalculates shares)")
+@click.option("--paid", "paid_by_name", default=None, help="New payer (name)")
+def exp_update(expense_id, description, expense_date, category_name, amount, paid_by_name):
+    """Update an expense's fields. Recalculates shares if amount changes."""
+    # Validate at least one update was requested
+    if description is None and expense_date is None and category_name is None and amount is None and paid_by_name is None:
+        console.print("[yellow]No update fields provided. Use --help to see options.[/]")
+        return
+
+    # Resolve category
+    category_id = None
+    if category_name is not None:
+        cats = db.list_categories()
+        match = [c for c in cats if category_name.lower() in c["name"].lower()]
+        if not match:
+            console.print(f"[red]Category '{category_name}' not found.[/]")
+            sys.exit(1)
+        category_id = match[0]["id"]
+
+    # Resolve payer
+    paid_by_id = None
+    if paid_by_name is not None:
+        # Get the trip_id from this expense
+        existing = db.get_expense_shares(expense_id)
+        if not existing:
+            console.print(f"[red]Expense #{expense_id} not found.[/]")
+            sys.exit(1)
+        trip_id = db.get_expense_trip_id(expense_id)
+        people = db.get_participants(trip_id)
+        match = [p for p in people if paid_by_name.lower() == p["name"].lower()]
+        if not match:
+            console.print(f"[red]'{paid_by_name}' not in trip participants.[/]")
+            sys.exit(1)
+        paid_by_id = match[0]["id"]
+
+    # Ask about recalculating shares if amount changes
+    recalculate = False
+    if amount is not None:
+        recalculate = True
+
+    try:
+        updated = db.update_expense(
+            expense_id=expense_id,
+            description=description,
+            expense_date=expense_date,
+            category_id=category_id,
+            amount=amount,
+            paid_by=paid_by_id,
+            recalculate_shares=recalculate,
+        )
+    except ValueError as e:
+        console.print(f"[red]Error:[/] {e}")
+        sys.exit(1)
+
+    if updated:
+        console.print(f"[green]✅ Updated expense #{expense_id}[/]")
+        if recalculate:
+            console.print(f"   ⚠️  Amount changed — shares recalculated.")
+    else:
+        console.print(f"[red]#{expense_id} not found.[/]")
+
+
 @exp.command("delete")
 @click.argument("expense_id", type=int)
 def exp_delete(expense_id):

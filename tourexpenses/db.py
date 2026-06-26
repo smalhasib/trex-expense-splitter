@@ -316,6 +316,77 @@ def add_expense(
     return expense_id
 
 
+def update_expense(
+    expense_id: int,
+    description: str | None = None,
+    expense_date: str | None = None,
+    category_id: int | None = None,
+    amount: float | None = None,
+    paid_by: int | None = None,
+    recalculate_shares: bool = False,
+) -> bool:
+    """Update an expense.
+    
+    Simple field updates (description, date, category, paid_by) are direct.
+    If `amount` or `paid_by` changes, the caller should set recalculate_shares=True
+    to have the equal-split shares recalculated automatically.
+    """
+    conn = get_conn()
+    
+    fields = []
+    params = []
+    if description is not None:
+        fields.append("description = ?")
+        params.append(description)
+    if expense_date is not None:
+        fields.append("expense_date = ?")
+        params.append(expense_date)
+    if category_id is not None:
+        fields.append("category_id = ?")
+        params.append(category_id)
+    if amount is not None:
+        if amount <= 0:
+            conn.close()
+            raise ValueError("Amount must be positive")
+        fields.append("amount = ?")
+        params.append(amount)
+    if paid_by is not None:
+        fields.append("paid_by = ?")
+        params.append(paid_by)
+    
+    if not fields and not recalculate_shares:
+        conn.close()
+        return False  # Nothing to update
+    
+    if fields:
+        params.append(expense_id)
+        conn.execute(
+            f"UPDATE expenses SET {', '.join(fields)} WHERE id = ?",
+            params,
+        )
+
+    if recalculate_shares and amount is not None:
+        # Recalculate equal-split shares among all participants (active only)
+        conn.execute("DELETE FROM expense_shares WHERE expense_id = ?", (expense_id,))
+        trip_row = conn.execute("SELECT trip_id, split_type FROM expenses WHERE id = ?", (expense_id,)).fetchone()
+        if trip_row and trip_row["split_type"] == "equal":
+            people = get_participants(trip_row["trip_id"])
+            if people:
+                per_person = round(amount / len(people), 2)
+                total_shares = per_person * len(people)
+                diff = round(amount - total_shares, 2)
+                for i, p in enumerate(people):
+                    share = per_person + (diff if i == len(people) - 1 else 0)
+                    conn.execute(
+                        "INSERT INTO expense_shares (expense_id, participant_id, share_amount) VALUES (?, ?, ?)",
+                        (expense_id, p["id"], round(share, 2)),
+                    )
+
+    conn.commit()
+    conn.close()
+    return True
+
+
 def get_expenses(
     trip_id: int | None = None,
     category_id: int | None = None,
@@ -524,3 +595,12 @@ def get_expense_shares(expense_id: int) -> list[sqlite3.Row]:
     ).fetchall()
     conn.close()
     return rows
+
+
+def get_expense_trip_id(expense_id: int) -> int | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT trip_id FROM expenses WHERE id = ?", (expense_id,)
+    ).fetchone()
+    conn.close()
+    return row["trip_id"] if row else None
