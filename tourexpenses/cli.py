@@ -280,17 +280,23 @@ def exp_add(amount, description, category_name, paid_by_name, trip_id, expense_d
                 remaining -= share
             custom_shares[p["id"]] = share
 
-    eid = db.add_expense(
-        trip_id=trip_id,
-        category_id=cat["id"],
-        amount=amount,
-        paid_by=payer["id"],
-        description=description or "",
-        expense_date=expense_date,
-        split_type=split,
-        custom_shares=custom_shares,
-        split_for=split_for.split(",") if split_for else None,
-    )
+    split_for_list = split_for.split(",") if split_for else None
+
+    try:
+        eid = db.add_expense(
+            trip_id=trip_id,
+            category_id=cat["id"],
+            amount=amount,
+            paid_by=payer["id"],
+            description=description or "",
+            expense_date=expense_date,
+            split_type=split,
+            custom_shares=custom_shares,
+            split_for=split_for_list,
+        )
+    except ValueError as e:
+        console.print(f"[red]Error:[/] {e}")
+        sys.exit(1)
 
     console.print(f"\n[green]✅ Expense logged![/] {cat['emoji']} {fmt(amount, t['currency'])} — {description or cat['name']}")
     split_info = f"Paid by [bold]{payer['name']}[/] | Split: [bold]{split}[/]"

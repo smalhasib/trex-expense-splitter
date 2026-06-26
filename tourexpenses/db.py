@@ -263,9 +263,14 @@ def add_expense(
         if split_for:
             # Split only among named participants
             names_lower = [n.strip().lower() for n in split_for]
+            valid_names = {p["name"].lower() for p in all_people}
+            invalid = [n for n in names_lower if n not in valid_names]
+            if invalid:
+                raise ValueError(
+                    f"--for contains unknown names: {invalid}. "
+                    f"Available: {[p['name'] for p in all_people]}"
+                )
             people = [p for p in all_people if p["name"].lower() in names_lower]
-            if not people:
-                people = all_people  # fallback
         else:
             # Auto-filter by join date: only those who joined on or before the expense date
             people = [p for p in all_people if not p["joined_on"] or p["joined_on"] <= edate]
