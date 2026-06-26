@@ -299,6 +299,11 @@ def add_expense(
                 (expense_id, p["id"], round(share, 2)),
             )
     elif split_type == "custom" and custom_shares:
+        total_custom = round(sum(custom_shares.values()), 2)
+        if abs(total_custom - amount) > 0.01:
+            raise ValueError(
+                f"Custom shares sum to {total_custom} but expense is {amount}"
+            )
         for pid, share in custom_shares.items():
             if share > 0:
                 conn.execute(

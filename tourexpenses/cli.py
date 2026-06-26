@@ -281,19 +281,35 @@ def exp_add(amount, description, category_name, paid_by_name, trip_id, expense_d
     custom_shares = None
     if split == "custom":
         people = db.get_participants(trip_id)
-        remaining = amount
-        custom_shares = {}
-        console.print(f"[bold]Custom split for {fmt(amount, t['currency'])}:[/]")
-        for i, p in enumerate(people):
-            is_last = (i == len(people) - 1)
-            if is_last:
-                share = round(remaining, 2)
-                console.print(f"  {p['name']}: {fmt(share, t['currency'])} [dim](auto)[/]")
-            else:
-                share = click.prompt(f"  {p['name']}'s share", type=float, default=round(remaining / (len(people) - i), 2))
+        while True:
+            console.print(f"[bold]Custom split for {fmt(amount, t['currency'])}:[/]")
+            console.print(f"  (Enter each person's share. Sum must equal {fmt(amount, t['currency'])})")
+            custom_shares = {}
+            for p in people:
+                while True:
+                    share = click.prompt(
+                        f"  {p['name']}'s share",
+                        type=float,
+                    )
+                    if share < 0:
+                        console.print(f"[red]⚠️  Share cannot be negative. Try again.[/]")
+                        continue
+                    break
                 share = round(share, 2)
-                remaining -= share
-            custom_shares[p["id"]] = share
+                custom_shares[p["id"]] = share
+
+            # Validate sum
+            total_entered = round(sum(custom_shares.values()), 2)
+            if abs(total_entered - amount) < 0.01:
+                break  # Valid
+            else:
+                console.print(
+                    f"[red]⚠️  Shares sum to {fmt(total_entered, t['currency'])} "
+                    f"but expense is {fmt(amount, t['currency'])}.[/]"
+                )
+                if not click.confirm("Re-enter shares?", default=True):
+                    console.print(f"[yellow]⚠️  Saved with discrepancy (sum={fmt(total_entered, t['currency'])}).[/]")
+                    break
 
     split_for_list = split_for.split(",") if split_for else None
 
